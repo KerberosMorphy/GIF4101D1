@@ -60,7 +60,7 @@ TMAX_Q2Eiris = 15
 # Question 2B
 # ImplÃ©mentation du discriminant linÃ©aire
 class DiscriminantLineaire:
-    def __init__(self, eta=1e-2, epsilon=1e-4, max_iter=3000):
+    def __init__(self, eta=1e-2, epsilon=1e-2, max_iter=3000):
         # Cette fonction est dÃ©jÃ  codÃ©e pour vous, vous n'avez qu'Ã  utiliser
         # les variables membres qu'elle dÃ©finit dans les autres fonctions de
         # cette classe.
@@ -82,8 +82,8 @@ class DiscriminantLineaire:
         # ImplÃ©mentez la fonction d'entraÃ®nement du classifieur, selon
         # les Ã©quations que vous avez dÃ©veloppÃ©es dans votre rapport.
         #X = normalize(X, axis=0)
-        
-        # On initialise les poids alÃ©atoirement
+        print('----------------------------')        
+        # On initialise les poids alÃ©atoirement et les dérivés partielles
         w = numpy.random.rand(X.shape[1]+1)
         partial_der = numpy.zeros(w.shape)          
         
@@ -94,64 +94,66 @@ class DiscriminantLineaire:
         # Vous Ãªtes libres d'utiliser les noms de variable de votre choix, sauf
         # pour les poids qui doivent Ãªtre contenus dans la variable w dÃ©finie plus haut
         
+        #on transforme les labels dans le forme qui nous interesse
         y = numpy.array(map(lambda x: 1 if x == 1 else -1,y))
+        #On peut se permettre de calculer toute les normes une fois au lieu de tout
+        # recacluler a chaque itération
         norms = numpy.sum(numpy.array(map(lambda x: x*x, X)), axis = 1)
 
-        #y = (y*2)-1        
+        #Valeur de l'erreur initialisée 
         tempErr = 999999999999
         for i in range(self.max_iter):
-            '''
-            if (i%100 == 0):
-                print(i)
-            '''    
-                
+            
             if(i == self.max_iter - 1):
                 print('max iter reached')
             
+            #calcul de h pour tout x
             h = numpy.array(map(lambda x: sum(numpy.append(x, 1) * w), X))
-            '''
-            h = numpy.array([])
-            for x in X:
-                h = numpy.append(h, sum(numpy.append(x, 1) * w))    
-            '''
             
-            
+            #Liste des index où le classifieur a faux
             errindexes = numpy.where(h * y < 0)
             
+            #On arrête tout si il n'y a pas d'erreur (car la m.a.j) des poids 
+            #repose sur les individus mal classés
             if (len(errindexes[0]) == 0):
                 print('no misclassification')
                 self.w = w
                 break
-            else:
-                Xerr = numpy.array(X[errindexes, :][0])
-                
-                herr = h[errindexes[0]]
-                yerr = y[errindexes[0]]
-                normerr = norms[errindexes[0]]
-                
-                
-                Err = 0.5 * sum((yerr - herr) * (yerr - herr) / normerr)
-
-                temp = (herr - yerr) / normerr
-                
+        
+            #extraction des individus mal classées
+            Xerr = numpy.array(X[errindexes, :][0])
+            herr = h[errindexes[0]]
+            yerr = y[errindexes[0]]
+            normerr = norms[errindexes[0]]
             
+            #Calcul du critère d'erreur
+            Err = 0.5 * sum((yerr - herr) * (yerr - herr) / normerr)
+            #if(i%100 == 0):
+            #   print(Err)
+            
+            
+            #Critère d'arrêt
             if(abs(tempErr - Err) < self.epsilon):
                 print('local minimum reached')
                 #print(Err)
                 #print(abs(tempErr - Err))
                 break
             
+            #Stockage de l'ancienne valeur d'erreur
             tempErr = Err       
+            
             #reset without affectation
             partial_der = partial_der * 0
             
-            #The two commented blocks bellow are equivalent to this line
-            #partial_der = reduce(lambda acc, x: acc + numpy.append(numpy.array(Xerr[x,:]), [1]) * temp[x],range(len(errindexes)), partial_der)
-            
+            #Permet de séparer le calcul ci dessous et de ne pas le refaire à chaque fois            
+            temp = (herr - yerr) / normerr
+            #The 3 blocks bellow are equivalent
+            #Calcul des dérivés partielles
+            '''
+            partial_der = reduce(lambda acc, x: acc + numpy.append(numpy.array(Xerr[x,:]), [1]) * temp[x],range(len(errindexes)), partial_der)
+            '''
             for t in range(len(errindexes)):
                 partial_der = partial_der + numpy.append(numpy.array(Xerr[t,:]), [1]) * temp[t]
-                
-            
             '''
             for t in range(len(errindexes)):
                 for j in range(X.shape[1]):
@@ -159,7 +161,11 @@ class DiscriminantLineaire:
                 #Ne pas oublier w0
                 partial_der[-1] = partial_der[-1] + temp[t]
             '''
+            
+            #Mise à jour des poids
             w = w - (self.eta * partial_der)
+            
+            #Useful to display evolution of classificateur through iterations
             '''
             if (i%100 == 0):
                 print(Err)
@@ -196,7 +202,11 @@ class DiscriminantLineaire:
         # TODO Q2B
         # ImplÃ©mentez la fonction de prÃ©diction
         # Vous pouvez supposer que fit() a prÃ©alablement Ã©tÃ© exÃ©cutÃ©
+        
+        #pour chaque x, on calcule h(x)
         h = map(lambda x: sum(numpy.append(x, 1) * self.w), X)
+        
+        #On renvoie la prediction 1 si x > 0, o sinon
         return numpy.array(map(lambda x: 1 if x >= 0 else 0, h)), h
     
     def score(self, X, y):
@@ -208,11 +218,13 @@ class DiscriminantLineaire:
         # beaucoup la taille de cette fonction!
         
         pred, h = self.predict(X)
-        #bi-class where one class is labelled 1        
-        y = map(lambda x: 1 if x == 1 else -1,y)
+        pred = numpy.array(pred)
+        #bi-class where one class is labelled 1     
+        
+        #On s'assure que y soit au bon format pour tester
+        y = map(lambda x: 1 if x == 1 else 0,y)
         y = numpy.array(y)
 
-        pred = numpy.array(pred)
     
         acc = len(numpy.where(pred == y)[0])
         return float(acc) / float(len(X))
@@ -236,10 +248,14 @@ class ClassifieurUnContreTous:
         # ImplÃ©mentez ici une approche un contre tous, oÃ¹ chaque classifieur 
         # (contenu dans self.estimators) est entraÃ®nÃ© Ã  distinguer une seule classe 
         # versus toutes les autres
+        
+        #On crée un classifieur par classe
+        #on pourrait en créer n-1
+        #for i in range(self.n_classes - 1):
         for i in range(self.n_classes):
             clf = self.estimators[i]
-            yPred = map(lambda x: 1 if x == i else -1, y)
-            clf.fit(X, yPred)
+            y_train = map(lambda x: 1 if x == i else -1, y)
+            clf.fit(X, y_train)
             self.estimators[i] = clf
     
     
@@ -252,6 +268,7 @@ class ClassifieurUnContreTous:
         h = numpy.zeros((len(X), self.n_classes))
         
         for i in range(self.n_classes):
+        #for i in range(self.n_classes - 1):
             clf = self.estimators[i]
             pred[:, i], h[:,i] = clf.predict(X)
         
@@ -273,6 +290,10 @@ class ClassifieurUnContreTous:
                 #Sans option de rejet
                 reconstituedPred[i] = numpy.argmax(h[i])
                 
+                #Dans le cas n-1 classifier
+                #reconstituedPred[i] = self.n_classes - 1
+                
+                
                 
         #print(reconstituedPred)
         return numpy.array(reconstituedPred)
@@ -283,7 +304,7 @@ class ClassifieurUnContreTous:
         # Ce score correspond Ã  la prÃ©cision (accuracy) moyenne.
         # Vous pouvez supposer que fit() a prÃ©alablement Ã©tÃ© exÃ©cutÃ©
         pred = self.predict(X)
-        #print(y)
+        
         return float(len(numpy.where(pred == y)[0])) / float(len(X))
 
 
@@ -293,6 +314,7 @@ if __name__ == '__main__':
 
     _times.append(time.time())
     # ProblÃ¨me Ã  2 classes
+    
     X, y = make_classification(n_features=2, n_redundant=0, n_informative=2,
                                n_clusters_per_class=1)
 
@@ -303,13 +325,13 @@ if __name__ == '__main__':
     x1 = numpy.arange(min(X[:,0]), max(X[:,0]), 0.05)
     x2 = numpy.arange(min(X[:,1]), max(X[:,1]), 0.05)
     xx, yy = numpy.meshgrid(x1, x2)        
-
+    ax1.set_title('classifier bi-class')
     #Part 1 : 1V1
-    clf = DiscriminantLineaire()
+    clf = DiscriminantLineaire(eta=3e-2, epsilon=5e-5, max_iter=3000)
     clf.fit(X, y)
     
     score = clf.score(X, y)
-    
+    print('score', score)
     pred, h = clf.predict(numpy.c_[xx.ravel(), yy.ravel()])
     pred = pred.reshape(xx.shape)
     cs = ax1.contourf(xx, yy, pred, cmap=pyplot.cm.Paired)
@@ -325,7 +347,7 @@ if __name__ == '__main__':
     
     pyplot.show()
 
-
+    
     _times.append(time.time())
     # 3 classes
     X, y = make_classification(n_features=2, n_redundant=0, n_informative=2,
@@ -333,10 +355,14 @@ if __name__ == '__main__':
 
     f, (ax1) = pyplot.subplots(1, 1, sharex=True)    
     x1 = numpy.arange(min(X[:,0]), max(X[:,0]), 0.05)
+    ax1.set_title('classifier multi-class')
+    
     x2 = numpy.arange(min(X[:,1]), max(X[:,1]), 0.05)
     xx, yy = numpy.meshgrid(x1, x2)        
-
-    clf = ClassifieurUnContreTous(3)
+    
+    
+    
+    clf = ClassifieurUnContreTous(3, eta=1e-2 , epsilon=1e-4, max_iter= 1500)
     clf.fit(X, y)
 
     
@@ -365,6 +391,10 @@ if __name__ == '__main__':
     
     pyplot.show()
 
+
+
+
+    '
     # Question 2D
 
     _times.append(time.time())
@@ -391,14 +421,13 @@ if __name__ == '__main__':
     # Pour les autres approches, conservez les valeurs par dÃ©faut
     # N'oubliez pas que l'Ã©valuation doit Ãªtre faite par une validation
     # croisÃ©e Ã  K=3 plis!
-    
-    clfs = [DiscriminantLineaire(eta=1e-4, epsilon=1e-2, max_iter=1000),
+    clfs = [DiscriminantLineaire(eta=3e-2, epsilon=1e-4, max_iter=2000),
             LinearDiscriminantAnalysis(),
             Perceptron(),
             LogisticRegression()
             ]
     scores = numpy.zeros(len(clfs))
-    
+    scores_train = numpy.zeros(len(clfs))
     rkf = KFold(n_splits=3, shuffle=True)
     for train_index, test_index in rkf.split(X):
         X_train, X_test = X[train_index], X[test_index]
@@ -406,14 +435,24 @@ if __name__ == '__main__':
         for c, i in zip(clfs, range(len(clfs))):   
             #print(clf)
             c.fit(X_train, y_train)
+            scores_train[i] += c.score(X_train, y_train)
             scores[i] += c.score(X_test, y_test)
             #print(c.__class__.__name__, c.score(X_test, y_test))
-    scores = scores / 3    
-    print(scores)
+    scores = scores / 3  
+    scores_train = scores_train / 3    
+    
+    print('-------')
+    print('score entraînement cancer')
+    for i in range(len(scores)):
+        print(clfs[i].__class__.__name__, scores_train[i])
+
+    print('-------')
+    print('score généralisation cancer')
+    for i in range(len(scores)):
+        print(clfs[i].__class__.__name__, scores[i])
+
 
     
-    #clfs = [DiscriminantLineaire(eta=1e-4, epsilon=1e-2, max_iter=1000)]
-
     _times.append(time.time())
     checkTime(TMAX_Q2Dbc, "2Dbc")
     
@@ -421,9 +460,6 @@ if __name__ == '__main__':
     # TODO Q2D
     # Chargez les donnÃ©es "Iris" et normalisez les de
     # maniÃ¨re Ã  ce que leur minimum et maximum soient de 0 et 1
-   
-    
-
 
     # TODO Q2D
     # Comparez les diverses approches demandÃ©es dans l'Ã©noncÃ© sur Iris
@@ -435,7 +471,7 @@ if __name__ == '__main__':
     # N'oubliez pas que l'Ã©valuation doit Ãªtre faite par une validation
     # croisÃ©e Ã  K=3 plis!
     
-    clfs = [ClassifieurUnContreTous(3, eta=1e-2, epsilon=1e-2, max_iter=3000),
+    clfs = [ClassifieurUnContreTous(3, eta=2e-2, epsilon=1e-4, max_iter=3000),
             LinearDiscriminantAnalysis(),
             Perceptron(),
             LogisticRegression()
@@ -446,6 +482,7 @@ if __name__ == '__main__':
     X = data.data
     y = data.target
     X = minmax_scale(X)
+    scores_train = numpy.zeros(len(clfs))
     scores = numpy.zeros(len(clfs))
     
     rkf = KFold(n_splits=3, shuffle=True)
@@ -453,18 +490,31 @@ if __name__ == '__main__':
         X_train, X_test = X[train_index], X[test_index]
         y_train, y_test = y[train_index], y[test_index]
         for c, i in zip(clfs, range(len(clfs))):   
-            #print(clf)
             c.fit(X_train, y_train)
+            scores_train[i] += c.score(X_train, y_train)
             scores[i] += c.score(X_test, y_test)
-            #print(c.__class__.__name__, c.score(X_test, y_test))
-    scores = scores / 3    
-    print(scores)
+            
+    scores = scores / 3
+    scores_train = scores_train / 3    
+    
+    print('-------')
+    print('score entraînement Iris')
+    for i in range(len(scores)):
+        print(clfs[i].__class__.__name__, scores_train[i])
+
+    print('-------')
+    print('score généralisation Iris')
+    for i in range(len(scores)):
+        print(clfs[i].__class__.__name__, scores[i])
 
     _times.append(time.time())
     checkTime(TMAX_Q2Diris, "2Diris")
+    
+
+   
 
 
-
+    
     
     
     _times.append(time.time())
@@ -515,7 +565,9 @@ if __name__ == '__main__':
     f, (ax1, ax2) = pyplot.subplots(1, 2, sharex=True)
     ax1.plot(weights, scoresUniformWeights)
     ax2.plot(weights, scoresDistanceWeights)
-
+    
+    ax1.set_title('uniform cancer')
+    ax2.set_title('distance cancer')
 
     pyplot.show()
 
@@ -559,6 +611,8 @@ if __name__ == '__main__':
         scoresDistanceWeights.append(sum2 / float(len(X)))
     
     
+    ax1.set_title('uniform Iris')
+    ax2.set_title('distance Iris')
 
 
     _times.append(time.time())

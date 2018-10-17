@@ -89,7 +89,9 @@ if __name__ == '__main__':
     ax2.hist(samp2,bins = 25, density = True)
     ax2.plot(np.arange(-5, 10, 0.01), curve, c= 'r')
     
-
+    
+    ax1.set_title('n = 50')
+    ax2.set_title('n = 10000')    
 
     # Affichage du graphique
     _times.append(time.time())
@@ -119,12 +121,16 @@ if __name__ == '__main__':
         arr = k.score_samples(xgrid)
         arr = np.exp(arr)
         ax1.plot(xgrid, arr, c = color)
-        
         k.fit(s2)
         arr = k.score_samples(xgrid)
         arr = np.exp(arr)
         ax2.plot(xgrid, arr, c = color)
+       
         
+    ax1.set_title('n = 50')
+    ax2.set_title('n = 10000')    
+    ax2.legend(['bw = 0.3', 'bw = 1', 'bw = 2', 'bw = 5'])
+    ax1.legend(['bw = 0.3', 'bw = 1', 'bw = 2', 'bw = 5'])
     # Affichage du graphique
     _times.append(time.time())
     checkTime(TMAX_Q1B, "1B")
